@@ -106,6 +106,7 @@ export interface AppState {
 // Error types
 export interface AppError {
   message: string;
-  type: 'reddit_api' | 'openai_api' | 'validation' | 'network' | 'unknown';
+  type: 'reddit_api' | 'openai_api' | 'network' | 'validation' | 'unknown';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any;
 } 

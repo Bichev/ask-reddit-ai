@@ -35,7 +35,7 @@ const Disclaimer: React.FC<DisclaimerProps> = ({
               Daily Limit Reached
             </h3>
             <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-              You've used all {CONFIG.RATE_LIMIT.MAX_REQUESTS} daily requests. The limit resets in{' '}
+              You&apos;ve used all {CONFIG.RATE_LIMIT.MAX_REQUESTS} daily requests. The limit resets in{' '}
               <strong>{formatTimeRemaining(resetTime)}</strong>.
             </p>
             <div className="space-y-2">

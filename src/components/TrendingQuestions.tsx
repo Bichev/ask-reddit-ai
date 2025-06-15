@@ -28,7 +28,7 @@ const TrendingQuestions: React.FC<TrendingQuestionsProps> = ({
 
   return (
     <div className="space-y-4">
-      {questions.map((item, index) => (
+      {questions.map((item) => (
         <div
           key={item.id}
           className="group cursor-pointer"

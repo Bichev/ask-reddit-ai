@@ -155,6 +155,7 @@ export function generateId(): string {
 /**
  * Debounce function for input handling
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   delay: number
@@ -169,6 +170,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Handle API errors and return user-friendly messages
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function handleApiError(error: any): AppError {
   if (error?.response?.status === 404) {
     return {
@@ -212,6 +214,7 @@ export function handleApiError(error: any): AppError {
 /**
  * Save data to localStorage safely
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function saveToLocalStorage(key: string, data: any): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(data));
