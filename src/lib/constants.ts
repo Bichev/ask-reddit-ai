@@ -101,7 +101,7 @@ export const CONFIG = {
     DEFAULT_TIMEFRAME: '24h' as const,
   },
   OPENAI: {
-    DEFAULT_MODEL: 'gpt-4' as const,
+    DEFAULT_MODEL: 'gpt-4o-mini' as const,
     MAX_TOKENS: 4000,
     TEMPERATURE: 0.7,
   },

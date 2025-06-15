@@ -47,7 +47,7 @@ export interface AIResponse {
 export interface AskQuestionRequest {
   subreddit: string;
   question: string;
-  model?: 'gpt-4' | 'gpt-3.5-turbo';
+  model?: 'gpt-4o-mini' | 'gpt-3.5-turbo';
 }
 
 export interface AskQuestionResponse {
@@ -100,7 +100,7 @@ export interface AppState {
   isLoading: boolean;
   currentAnswer: AIResponse | null;
   savedAnswers: ShareableAnswer[];
-  selectedModel: 'gpt-4' | 'gpt-3.5-turbo';
+  selectedModel: 'gpt-4o-mini' | 'gpt-3.5-turbo';
 }
 
 // Error types

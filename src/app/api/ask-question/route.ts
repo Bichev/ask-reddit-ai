@@ -16,7 +16,7 @@ async function generateAIResponse(
   question: string,
   redditContent: string,
   subreddit: string,
-  model: 'gpt-4' | 'gpt-3.5-turbo'
+  model: 'gpt-4o-mini' | 'gpt-3.5-turbo'
 ): Promise<AIResponse> {
   const systemPrompt = `You are an AI assistant that analyzes Reddit discussions and provides comprehensive, well-structured answers to user questions.
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate model
-    if (!['gpt-4', 'gpt-3.5-turbo'].includes(model)) {
+    if (!['gpt-4o-mini', 'gpt-3.5-turbo'].includes(model)) {
       return NextResponse.json(
         { success: false, error: 'Invalid model specified' },
         { status: 400 }

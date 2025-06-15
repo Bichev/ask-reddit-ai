@@ -38,7 +38,7 @@ export default function HomePage() {
     isLoading: false,
     currentAnswer: null,
     savedAnswers: [],
-    selectedModel: 'gpt-4',
+    selectedModel: 'gpt-4o-mini',
   });
 
   // Load saved answers from localStorage on mount
@@ -228,10 +228,10 @@ export default function HomePage() {
             <div className="mt-4 sm:mt-0">
               <select
                 value={appState.selectedModel}
-                onChange={(e) => setAppState(prev => ({ ...prev, selectedModel: e.target.value as 'gpt-4' | 'gpt-3.5-turbo' }))}
+                onChange={(e) => setAppState(prev => ({ ...prev, selectedModel: e.target.value as 'gpt-4o-mini' | 'gpt-3.5-turbo' }))}
                 className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="gpt-4">GPT-4 (Better Quality)</option>
+                <option value="gpt-4o-mini">GPT-4 (Better Quality)</option>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Faster)</option>
               </select>
             </div>
