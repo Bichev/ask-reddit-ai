@@ -132,9 +132,9 @@ class RedditOAuthService {
           });
 
           // Fetch comments for top posts
-          if (posts.length <= 5) {
+          if (posts.length <= 10) {
             try {
-              const comments = await this.fetchComments(post.id, 10);
+              const comments = await this.fetchComments(post.id, 100);
               allComments.push(...comments);
             } catch (error) {
               console.error(`Error fetching comments for post ${post.id}:`, error);

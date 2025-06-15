@@ -113,7 +113,17 @@ export const CONFIG = {
   STORAGE: {
     SAVED_ANSWERS_KEY: 'ask-reddit-ai-saved-answers',
     PREFERENCES_KEY: 'ask-reddit-ai-preferences',
+    RATE_LIMIT_KEY: 'ask-reddit-ai-rate-limit',
     MAX_SAVED_ANSWERS: 50,
+  },
+  RATE_LIMIT: {
+    MAX_REQUESTS: 3,
+    RESET_HOURS: 24,
+  },
+  CONTACT: {
+    LINKEDIN: 'https://www.linkedin.com/in/vladimir-bichev-383b1525/',
+    GITHUB: 'https://github.com/Bichev/ask-reddit-ai',
+    EMAIL: 'baker@sobrd.com', // Replace with your email
   },
 } as const;
 

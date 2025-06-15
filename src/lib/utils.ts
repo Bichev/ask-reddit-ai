@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { VALIDATION, ERROR_MESSAGES } from './constants';
+import { VALIDATION, ERROR_MESSAGES, CONFIG } from './constants';
 import type { AppError, RedditPost, RedditComment } from '@/types';
 
 /**
@@ -266,4 +266,100 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     console.error('Failed to copy to clipboard:', error);
     return false;
   }
+}
+
+/**
+ * Rate limiting functions
+ */
+interface RateLimitData {
+  count: number;
+  resetTime: number;
+}
+
+// Check if we're in development mode (localhost)
+function isDevelopment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.hostname === 'localhost' || 
+         window.location.hostname === '127.0.0.1' ||
+         window.location.hostname === '0.0.0.0' ||
+         process.env.NODE_ENV === 'development';
+}
+
+export function checkRateLimit(): { allowed: boolean; remaining: number; resetTime: number } {
+  // Skip rate limiting in development
+  if (isDevelopment()) {
+    return {
+      allowed: true,
+      remaining: 999, // Show high number for dev
+      resetTime: Date.now() + (24 * 60 * 60 * 1000)
+    };
+  }
+
+  try {
+    const data = loadFromLocalStorage<RateLimitData>(CONFIG.STORAGE.RATE_LIMIT_KEY, {
+      count: 0,
+      resetTime: Date.now() + (CONFIG.RATE_LIMIT.RESET_HOURS * 60 * 60 * 1000)
+    });
+
+    const now = Date.now();
+    
+    // Reset if time has passed
+    if (now >= data.resetTime) {
+      const newData: RateLimitData = {
+        count: 0,
+        resetTime: now + (CONFIG.RATE_LIMIT.RESET_HOURS * 60 * 60 * 1000)
+      };
+      saveToLocalStorage(CONFIG.STORAGE.RATE_LIMIT_KEY, newData);
+      return {
+        allowed: true,
+        remaining: CONFIG.RATE_LIMIT.MAX_REQUESTS,
+        resetTime: newData.resetTime
+      };
+    }
+
+    const remaining = CONFIG.RATE_LIMIT.MAX_REQUESTS - data.count;
+    return {
+      allowed: remaining > 0,
+      remaining: Math.max(0, remaining),
+      resetTime: data.resetTime
+    };
+  } catch (error) {
+    console.error('Error checking rate limit:', error);
+    return { allowed: true, remaining: CONFIG.RATE_LIMIT.MAX_REQUESTS, resetTime: Date.now() };
+  }
+}
+
+export function incrementRateLimit(): void {
+  // Skip incrementing in development
+  if (isDevelopment()) {
+    return;
+  }
+
+  try {
+    const data = loadFromLocalStorage<RateLimitData>(CONFIG.STORAGE.RATE_LIMIT_KEY, {
+      count: 0,
+      resetTime: Date.now() + (CONFIG.RATE_LIMIT.RESET_HOURS * 60 * 60 * 1000)
+    });
+
+    const updatedData: RateLimitData = {
+      count: data.count + 1,
+      resetTime: data.resetTime
+    };
+
+    saveToLocalStorage(CONFIG.STORAGE.RATE_LIMIT_KEY, updatedData);
+  } catch (error) {
+    console.error('Error incrementing rate limit:', error);
+  }
+}
+
+export function formatTimeRemaining(resetTime: number): string {
+  const now = Date.now();
+  const remaining = Math.max(0, resetTime - now);
+  const hours = Math.floor(remaining / (1000 * 60 * 60));
+  const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 } 

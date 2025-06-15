@@ -20,6 +20,8 @@ import {
   generateId,
   saveToLocalStorage,
   loadFromLocalStorage,
+  checkRateLimit,
+  incrementRateLimit,
 } from '@/lib/utils';
 import type { ShareableAnswer, AppState } from '@/types';
 
@@ -29,6 +31,8 @@ import QuestionInput from '@/components/QuestionInput';
 import TrendingQuestions from '@/components/TrendingQuestions';
 import AnswerDisplay from '@/components/AnswerDisplay';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import Disclaimer from '@/components/Disclaimer';
+import Footer from '@/components/Footer';
 
 export default function HomePage() {
   const [appState, setAppState] = useState<AppState>({
@@ -41,10 +45,23 @@ export default function HomePage() {
     selectedModel: 'gpt-4o-mini',
   });
 
-  // Load saved answers from localStorage on mount
+  const [rateLimit, setRateLimit] = useState<{
+    allowed: boolean;
+    remaining: number;
+    resetTime: number;
+  }>({
+    allowed: true,
+    remaining: CONFIG.RATE_LIMIT.MAX_REQUESTS,
+    resetTime: Date.now(),
+  });
+
+  // Load saved answers and check rate limit on mount
   useEffect(() => {
     const savedAnswers = loadFromLocalStorage<ShareableAnswer[]>(CONFIG.STORAGE.SAVED_ANSWERS_KEY, []);
+    const rateLimitStatus = checkRateLimit();
+    
     setAppState(prev => ({ ...prev, savedAnswers }));
+    setRateLimit(rateLimitStatus);
   }, []);
 
   // Save answers to localStorage when savedAnswers changes
@@ -101,6 +118,14 @@ export default function HomePage() {
 
   // Submit question to get AI answer
   const handleSubmitQuestion = async () => {
+    // Check rate limit first
+    const rateLimitStatus = checkRateLimit();
+    if (!rateLimitStatus.allowed) {
+      setRateLimit(rateLimitStatus);
+      toast.error(`Daily limit reached. Try again in ${Math.ceil((rateLimitStatus.resetTime - Date.now()) / (1000 * 60 * 60))} hours.`);
+      return;
+    }
+
     const currentSubreddit = appState.selectedSubreddit === 'custom' 
       ? appState.customSubreddit 
       : appState.selectedSubreddit;
@@ -138,6 +163,11 @@ export default function HomePage() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to get answer');
       }
+
+      // Increment rate limit counter on successful request
+      incrementRateLimit();
+      const newRateLimitStatus = checkRateLimit();
+      setRateLimit(newRateLimitStatus);
 
       setAppState(prev => ({ ...prev, currentAnswer: data.data }));
       toast.success('Answer generated successfully!');
@@ -204,7 +234,7 @@ export default function HomePage() {
     ? appState.customSubreddit 
     : appState.selectedSubreddit;
 
-  const canSubmit = Boolean(currentSubreddit && appState.question && !appState.isLoading);
+  const canSubmit = Boolean(currentSubreddit && appState.question && !appState.isLoading && rateLimit.allowed);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -225,7 +255,7 @@ export default function HomePage() {
             </div>
             
             {/* Model Selector */}
-            <div className="mt-4 sm:mt-0">
+            {/* <div className="mt-4 sm:mt-0">
               <select
                 value={appState.selectedModel}
                 onChange={(e) => setAppState(prev => ({ ...prev, selectedModel: e.target.value as 'gpt-4o-mini' | 'gpt-3.5-turbo' }))}
@@ -234,13 +264,22 @@ export default function HomePage() {
                 <option value="gpt-4o-mini">GPT-4 (Better Quality)</option>
                 <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Faster)</option>
               </select>
-            </div>
+            </div> */}
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Disclaimer */}
+        <div className="mb-8">
+          <Disclaimer 
+            isRateLimited={!rateLimit.allowed}
+            remaining={rateLimit.remaining}
+            resetTime={rateLimit.resetTime}
+          />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Input Form */}
           <div className="lg:col-span-2 space-y-6">
@@ -270,6 +309,11 @@ export default function HomePage() {
                 isLoading={appState.isLoading}
                 canSubmit={canSubmit}
               />
+              {!rateLimit.allowed && (
+                <div className="mt-4 text-sm text-red-600 dark:text-red-400">
+                  Daily limit reached. Please check the disclaimer above for more information.
+                </div>
+              )}
             </div>
 
             {/* Answer Display */}
@@ -362,6 +406,9 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
