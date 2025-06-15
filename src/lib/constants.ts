@@ -17,6 +17,15 @@ export const POPULAR_SUBREDDITS: PopularSubreddit[] = [
     description: 'Computer programming discussions',
     subscribers: '5M',
   },
+  { 
+    name: 'wallstreetbets',
+    description: 'Wall Street Bets discussions',
+    subscribers: '1.5M',
+  },
+  { name: 'cursor',
+    description: 'Cursor discussions',
+    subscribers: '500M',
+  },
   {
     name: 'science',
     description: 'Science news and research',
