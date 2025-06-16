@@ -2,12 +2,220 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { CONFIG } from '@/lib/constants';
 import { handleApiError, extractRedditContent } from '@/lib/utils';
-import type { AskQuestionRequest, AskQuestionResponse, AIResponse } from '@/types';
+import type { AskQuestionRequest, AskQuestionResponse, AIResponse, SubredditData } from '@/types';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+// Reddit OAuth2 service for client credentials authentication
+class RedditOAuthService {
+  private accessToken: string | null = null;
+  private tokenExpiry: Date | null = null;
+  private config: {
+    clientId: string;
+    clientSecret: string;
+    userAgent: string;
+  };
+
+  constructor() {
+    this.config = {
+      clientId: process.env.REDDIT_CLIENT_ID || '',
+      clientSecret: process.env.REDDIT_CLIENT_SECRET || '',
+      userAgent: 'ask-rddt-ai by /u/Witty_Ticket_4101'
+    };
+
+    if (!this.config.clientId || !this.config.clientSecret) {
+      throw new Error('Reddit API credentials not configured. Please set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET');
+    }
+  }
+
+  // Get OAuth2 access token using client credentials
+  private async getAccessToken(): Promise<string> {
+    try {
+      // Check if we have a valid token
+      if (this.accessToken && this.tokenExpiry && new Date() < this.tokenExpiry) {
+        return this.accessToken;
+      }
+
+      console.log('🔑 Requesting new Reddit OAuth2 token...');
+
+      // Get new access token using client credentials
+      const auth = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString('base64');
+      
+      const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'User-Agent': this.config.userAgent,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'grant_type=client_credentials'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Reddit OAuth failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      this.accessToken = data.access_token;
+      
+      if (!this.accessToken) {
+        throw new Error('No access token received from Reddit API');
+      }
+      
+      // Token expires in 1 hour, set expiry to 50 minutes to be safe
+      this.tokenExpiry = new Date(Date.now() + (50 * 60 * 1000));
+      
+      console.log('✅ Reddit OAuth2 token obtained successfully');
+      return this.accessToken;
+    } catch (error) {
+      console.error('❌ Error getting Reddit access token:', error);
+      throw new Error(`Failed to authenticate with Reddit API: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Fetch Reddit data directly
+  async fetchSubredditData(subreddit: string, timeframe: string = '24h', limit: number = 25): Promise<SubredditData> {
+    try {
+      const accessToken = await this.getAccessToken();
+      
+      const timeMap: Record<string, string> = {
+        '24h': 'day',
+        '48h': 'day',
+        'week': 'week',
+      };
+
+      console.log(`📥 Fetching submissions from r/${subreddit} via OAuth...`);
+      
+      const response = await fetch(
+        `https://oauth.reddit.com/r/${subreddit}/top?t=${timeMap[timeframe] || 'day'}&limit=${limit}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'User-Agent': this.config.userAgent
+          }
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error(`Subreddit r/${subreddit} not found`);
+        }
+        if (response.status === 403) {
+          throw new Error(`Subreddit r/${subreddit} is private or banned`);
+        }
+        throw new Error(`Reddit API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data?.data?.children) {
+        throw new Error(`No data received from r/${subreddit}`);
+      }
+
+      const posts = [];
+      const allComments = [];
+
+      // Process submissions
+      for (const child of data.data.children.slice(0, limit)) {
+        const post = child.data;
+        
+        if (!post.stickied) {
+          posts.push({
+            id: post.id,
+            title: post.title,
+            selftext: post.selftext || '',
+            author: post.author || '[deleted]',
+            score: post.score || 0,
+            num_comments: post.num_comments || 0,
+            created_utc: post.created_utc,
+            url: post.url,
+            subreddit: post.subreddit,
+            permalink: post.permalink,
+            upvote_ratio: post.upvote_ratio || 0,
+          });
+
+          // Fetch comments for top posts
+          if (posts.length <= 5) {
+            try {
+              const comments = await this.fetchComments(post.id, 10);
+              allComments.push(...comments);
+            } catch (error) {
+              console.error(`Error fetching comments for post ${post.id}:`, error);
+            }
+          }
+        }
+      }
+
+      console.log(`📊 Fetched ${posts.length} posts and ${allComments.length} comments from r/${subreddit}`);
+      
+      return {
+        posts: posts.sort((a, b) => b.score - a.score),
+        comments: allComments.sort((a, b) => b.score - a.score),
+        subreddit,
+        fetchedAt: Date.now()
+      };
+    } catch (error) {
+      console.error(`❌ Error fetching from r/${subreddit}:`, error);
+      throw error;
+    }
+  }
+
+  // Fetch comments for a submission
+  async fetchComments(submissionId: string, limit: number = 10) {
+    try {
+      const accessToken = await this.getAccessToken();
+      
+      const response = await fetch(
+        `https://oauth.reddit.com/comments/${submissionId}?limit=${limit}&sort=top&depth=2`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'User-Agent': this.config.userAgent
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Error fetching comments: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data?.[1]?.data?.children) {
+        return [];
+      }
+
+      const comments = [];
+      const commentListing = data[1].data.children;
+
+      for (const comment of commentListing.slice(0, limit)) {
+        if (comment.kind === 't1' && comment.data.body && 
+            comment.data.body !== '[deleted]' && 
+            comment.data.body !== '[removed]') {
+          comments.push({
+            id: comment.data.id,
+            body: comment.data.body,
+            author: comment.data.author || '[deleted]',
+            score: comment.data.score || 0,
+            created_utc: comment.data.created_utc,
+            depth: 0,
+          });
+        }
+      }
+
+      return comments.filter(c => c.score > 0).slice(0, limit);
+    } catch (error) {
+      console.error(`Error fetching comments for ${submissionId}:`, error);
+      return [];
+    }
+  }
+}
+
+// Create a singleton instance
+const redditService = new RedditOAuthService();
 
 /**
  * Generate AI response based on Reddit data and user question
@@ -99,41 +307,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // First, fetch Reddit data
-    const redditResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/reddit-data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        subreddit,
-        timeframe: '24h',
-        limit: 25,
-      }),
-    });
-
-    if (!redditResponse.ok) {
-      const errorData = await redditResponse.json();
-      return NextResponse.json(
-        { success: false, error: errorData.error || 'Failed to fetch Reddit data' },
-        { status: redditResponse.status }
-      );
-    }
-
-    const redditData = await redditResponse.json();
+    // Fetch Reddit data directly (no HTTP request)
+    console.log(`🔍 Processing question for r/${subreddit}: ${question}`);
+    const redditData = await redditService.fetchSubredditData(subreddit, '24h', 25);
     
-    if (!redditData.success || !redditData.data) {
+    if (!redditData.posts.length) {
       return NextResponse.json(
-        { success: false, error: 'No Reddit data available for this subreddit' },
+        { success: false, error: 'No recent content available for this subreddit' },
         { status: 404 }
       );
     }
 
     // Extract and prepare content for AI processing
-    const redditContent = extractRedditContent(
-      redditData.data.posts,
-      redditData.data.comments
-    );
+    const redditContent = extractRedditContent(redditData.posts, redditData.comments);
 
     if (!redditContent || redditContent.length < 100) {
       return NextResponse.json(
@@ -198,6 +384,7 @@ export async function GET() {
         success: false,
         message: 'OpenAI API connection failed',
         error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: Date.now(),
       },
       { status: 500 }
     );
