@@ -67,10 +67,10 @@ export const POPULAR_SUBREDDITS: PopularSubreddit[] = [
 export const TRENDING_QUESTIONS: TrendingQuestion[] = [
   {
     id: '1',
-    question: 'What are the most promising AI startups in 2024?',
+    question: 'What are the most promising AI startups in 2025?',
     subreddit: 'MachineLearning',
     popularity: 95,
-    tags: ['ai', 'startups', '2024'],
+    tags: ['ai', 'startups', '2025'],
   },
   {
     id: '2',
@@ -81,10 +81,10 @@ export const TRENDING_QUESTIONS: TrendingQuestion[] = [
   },
   {
     id: '3',
-    question: 'What programming languages should I learn in 2024?',
+    question: 'What programming languages should I learn in 2025?',
     subreddit: 'programming',
     popularity: 92,
-    tags: ['programming', 'career', '2024'],
+    tags: ['programming', 'career', '2025'],
   },
   {
     id: '4',
